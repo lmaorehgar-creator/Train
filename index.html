@@ -31,7 +31,7 @@ button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style></head><body>
 <h1>🚆 20424 Patalkot Express <span>Firozpur Cantt → Seoni</span></h1>
 <div class="map"><canvas id="c"></canvas>
-<div class="top"><small id="st" style="color:var(--muted)">Next stop</small><br><b id="nx">–</b> <span id="nd" style="color:var(--muted)"></span></div>
+<div class="top"><small id="st" style="color:var(--muted)">Next stop</small><br><b id="nx">–</b> <span id="nd" style="color:var(--muted)"></span><br><small id="gi" style="color:var(--muted);font-size:11px"></small></div>
 <div class="fab"><button id="zi">+</button><button id="zo">−</button><button id="vm" title="Follow / full route">⤢</button></div></div>
 <div class="hud">
 <div class="card speed"><small>Speed</small><div class="v" id="sp">0</div><small>km/h</small></div>
@@ -51,8 +51,8 @@ const K=TOT/D[n-1];D=D.map(x=>x*K);
 function at(s){s=Math.max(0,Math.min(TOT,s));let i=0;while(i<n-2&&D[i+1]<s)i++;const t=(s-D[i])/(D[i+1]-D[i]);return[ST[i][1]+(ST[i+1][1]-ST[i][1])*t,ST[i][2]+(ST[i+1][2]-ST[i][2])*t]}
 const xy=(p,c)=>[(p[1]-c[1])*Math.cos(c[0]*rad)*111320,(p[0]-c[0])*110540];
 const brg=(a,b)=>{const[x,y]=xy(b,a);return Math.atan2(x,y)};
-let s=0,v=0,nextI=1,dwell=0,el=0,fin=false,mode="demo",warp=60,full=false,zi=2,hd=0,off=0;
-const MPP=[25,60,150,400,1000];
+let s=0,v=0,nextI=1,dwell=0,el=0,fin=false,mode="demo",warp=60,full=false,zi=3,hd=0,off=0;
+const MPP=[60,150,300,600,1500];let ph=0,pulse=0,fdt=0;const SK=Array.from({length:16},()=>({x:Math.random(),y:Math.random(),l:20+Math.random()*30}));
 const cv=document.getElementById("c"),cx=cv.getContext("2d"),$=id=>document.getElementById(id);
 const jump=$("jump");jump.innerHTML='<option value="">Jump to…</option>'+ST.map((t,i)=>`<option value="${i}">${t[0]}</option>`).join("");
 jump.onchange=()=>{if(jump.value==="")return;const i=+jump.value;s=D[i];v=0;dwell=0;fin=false;nextI=Math.min(i+1,n-1);if(i===n-1){fin=true;nextI=n-1}jump.value=""};
@@ -68,18 +68,18 @@ function step(dt){
 let gl=null,ls=null,lt=null;
 function startGPS(){
  if(!navigator.geolocation){$("msg").textContent="GPS isn’t available in this browser.";return setMode("demo")}
- $("msg").textContent="Waiting for GPS…";
+ $("msg").textContent="Waiting for GPS…";$("gi").textContent="Waiting for GPS fix…";
  gl=navigator.geolocation.watchPosition(p=>{
   const u=[p.coords.latitude,p.coords.longitude];let best=1e12,bs=0;
   for(let i=0;i<n-1;i++){const a=ST[i].slice(1),b=ST[i+1].slice(1),[bx,by]=xy(b,a),[ux,uy]=xy(u,a),L=bx*bx+by*by;let t=Math.max(0,Math.min(1,(ux*bx+uy*by)/L));const dd=Math.hypot(ux-bx*t,uy-by*t);if(dd<best){best=dd;bs=D[i]+t*(D[i+1]-D[i])}}
-  const now=p.timestamp/1000;
-  if(p.coords.speed!=null&&!isNaN(p.coords.speed))v=p.coords.speed;else if(lt&&now-lt>1)v=Math.abs(bs-ls)/(now-lt);
+  const now=p.timestamp/1000;$("gi").textContent="GPS "+u[0].toFixed(4)+", "+u[1].toFixed(4)+" ±"+Math.round(p.coords.accuracy)+" m · "+(best/1000).toFixed(1)+" km from track";
+  if(p.coords.speed!=null&&!isNaN(p.coords.speed)&&p.coords.speed>=0)v=p.coords.speed;else if(lt&&now-lt>1)v=Math.abs(bs-ls)/(now-lt);
   ls=bs;lt=now;s=bs;off=best;dwell=0;fin=bs>TOT-100;nextI=Math.min(n-1,Math.max(1,D.findIndex(d=>d>s+50)));
   $("msg").textContent=best>3000?`You’re ${(best/1000).toFixed(0)} km from the track, so the position is snapped to the nearest point on the route.`:"Tracking your GPS position on the track.";
- },e=>{$("msg").textContent="GPS blocked or unavailable ("+e.message+"). Showing the demo run instead.";setMode("demo")},{enableHighAccuracy:true,maximumAge:2000});
+ },e=>{$("gi").textContent="GPS error "+e.code+": "+e.message+(e.code===1?" (location blocked for this page)":"")},{enableHighAccuracy:true,maximumAge:2000,timeout:30000});
 }
 function setMode(m){mode=m;$("mD").classList.toggle("on",m==="demo");$("mG").classList.toggle("on",m==="gps");$("demoCtl").style.display=m==="demo"?"flex":"none";
- if(gl!=null){navigator.geolocation.clearWatch(gl);gl=null}
+ if(gl!=null){navigator.geolocation.clearWatch(gl);gl=null}$("gi").textContent="";
  if(m==="gps")startGPS();else{v=0;dwell=0;$("msg").innerHTML='Demo run: simulated train on the 1,492 km route (elapsed <span id="el">0:00</span>). Approximate stations only.'}}
 $("mD").onclick=()=>setMode("demo");$("mG").onclick=()=>setMode("gps");
 document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{warp=+b.dataset.w;document.querySelectorAll("[data-w]").forEach(x=>x.classList.toggle("on",x===b))});
@@ -90,6 +90,8 @@ function draw(){
  const dpr=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
  if(cv.width!==W*dpr||cv.height!==H*dpr){cv.width=W*dpr;cv.height=H*dpr}
  cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=css("--map");cx.fillRect(0,0,W,H);
+ const kmh=v*3.6;ph+=fdt*(15+kmh*1.4);pulse=(pulse+fdt*(.4+kmh/60))%1;
+ if(!full&&kmh>1){cx.strokeStyle=css("--fg");cx.globalAlpha=.12;cx.lineWidth=2;cx.lineCap="round";SK.forEach(k=>{k.y+=fdt*kmh*.006*(.5+k.l/50);if(k.y>1.1)k.y=-.1;const x=k.x*W,y=k.y*H;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x,y+k.l*(.5+kmh/60));cx.stroke()});cx.globalAlpha=1}
  const P=at(s);let c,th=0,sc,aY;
  if(full){c=[26.5,77];th=0;sc=Math.min(W/560000,H/1050000)*.9;aY=H/2;c=[(30.938+21.907)/2,(74.613+79.54)/2]}
  else{c=P;const a=brg(at(s-300),at(s+700));let d=a-hd;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;hd+=d*.15;th=hd;sc=1/MPP[zi];aY=H*.72}
@@ -97,11 +99,13 @@ function draw(){
  const behind=[],ahead=[];ST.forEach((t,i)=>{(D[i]<=s?behind:ahead).push(i)});
  const bp=behind.map(i=>ST[i].slice(1)).concat([P]).map(T),ap=[P].concat(ahead.map(i=>ST[i].slice(1))).map(T);
  path(bp,"#9aa0a6",full?4:8);path(ap,"#1a73e8",full?4:8);
+ if(kmh>1&&ap.length>1){cx.save();cx.beginPath();ap.forEach((p,i)=>i?cx.lineTo(p[0],p[1]):cx.moveTo(p[0],p[1]));cx.setLineDash([8,16]);cx.lineDashOffset=ph;cx.strokeStyle="rgba(255,255,255,.85)";cx.lineWidth=full?1.5:3;cx.lineCap="butt";cx.stroke();cx.restore()}
  cx.font="12px system-ui,sans-serif";cx.textBaseline="middle";
  ST.forEach((t,i)=>{const[x,y]=T(t.slice(1));if(x<-20||x>W+20||y<-20||y>H+20)return;
   cx.beginPath();cx.arc(x,y,full?3.5:5,0,7);cx.fillStyle="#fff";cx.fill();cx.lineWidth=2;cx.strokeStyle=D[i]<=s?"#9aa0a6":"#1a73e8";cx.stroke();
   cx.lineWidth=3;cx.strokeStyle=css("--map");cx.strokeText(t[0],x+9,y);cx.fillStyle=css("--fg");cx.fillText(t[0],x+9,y)});
  const[px,py]=T(P),r=full?10:17;
+ if(kmh>1){cx.beginPath();cx.arc(px,py,r+pulse*(full?14:26),0,7);cx.strokeStyle="rgba(26,115,232,"+(.6*(1-pulse))+")";cx.lineWidth=3;cx.stroke()}
  cx.beginPath();cx.arc(px,py,r,0,7);cx.fillStyle="#1a73e8";cx.fill();cx.lineWidth=3;cx.strokeStyle="#fff";cx.stroke();
  cx.font=(full?12:19)+"px system-ui,sans-serif";cx.textAlign="center";cx.fillStyle="#fff";cx.fillText("🚆",px,py+1);cx.textAlign="left";
  // HUD
@@ -116,7 +120,7 @@ function draw(){
  const e=$("el");if(e){const m=Math.floor(el/60);e.textContent=Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
 }
 let last=performance.now();
-(function loop(t){const dt=Math.min(.1,(t-last)/1000);last=t;
+(function loop(t){const dt=Math.min(.1,(t-last)/1000);last=t;fdt=dt;
  if(mode==="demo"){let sim=dt*warp;while(sim>0){const d=Math.min(2,sim);step(d);sim-=d}}
- draw();requestAnimationFrame(loop)})(last);
+ try{draw()}catch(e){$("gi").textContent="Draw error: "+e.message}requestAnimationFrame(loop)})(last);
 </script></body></html>
